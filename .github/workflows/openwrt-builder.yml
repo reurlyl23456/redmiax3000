@@ -41,70 +41,64 @@ jobs:
         sudo apt-get -qq autoremove --purge
         sudo apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$USER /workdir
-        export WORKDIR=/workdir
 
     - name: Clone OpenWrt source
       run: |
-        cd $WORKDIR
+        cd $GITHUB_WORKSPACE
         git clone --depth 1 -b $REPO_BRANCH $REPO_URL openwrt
-        ln -sf $WORKDIR/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Verify source
       run: |
-        ls -la $WORKDIR
-        ls -la $WORKDIR/openwrt
+        ls -la $GITHUB_WORKSPACE
+        ls -la $GITHUB_WORKSPACE/openwrt
 
     - name: Load custom feeds
       run: |
-        if [ ! -d "$WORKDIR/openwrt" ]; then
+        if [ ! -d "$GITHUB_WORKSPACE/openwrt" ]; then
           echo "Error: openwrt directory not found!"
           exit 1
         fi
 
-        # 移动 feeds 配置
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF $WORKDIR/openwrt/feeds.conf.default
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF $GITHUB_WORKSPACE/openwrt/feeds.conf.default
 
-        # 执行自定义脚本
-        chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
-        cd $WORKDIR/openwrt
+        chmod +x $DIY_P1_SH
+        cd $GITHUB_WORKSPACE/openwrt
         bash $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Update and install feeds
       run: |
-        cd $WORKDIR/openwrt
+        cd $GITHUB_WORKSPACE/openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
     - name: Load custom configuration
       run: |
-        [ -e files ] && mv files $WORKDIR/openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $WORKDIR/openwrt/.config
-        chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
-        cd $WORKDIR/openwrt
+        [ -e files ] && mv files $GITHUB_WORKSPACE/openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $GITHUB_WORKSPACE/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd $GITHUB_WORKSPACE/openwrt
         bash $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: Download packages
       run: |
-        cd $WORKDIR/openwrt
+        cd $GITHUB_WORKSPACE/openwrt
         make defconfig
         make download -j4 || true
 
         # 删除异常小文件
         find dl -size -1024c -exec rm -f {} \;
 
-        # 压缩下载包以节省磁盘
-        tar -czf $WORKDIR/dl_archive.tar.gz -C dl .
+        # 压缩下载包以节省磁盘空间
+        tar -czf $GITHUB_WORKSPACE/dl_archive.tar.gz -C dl .
         rm -rf dl
         mkdir dl
-        tar -xzf $WORKDIR/dl_archive.tar.gz -C dl
+        tar -xzf $GITHUB_WORKSPACE/dl_archive.tar.gz -C dl
 
     - name: Compile firmware
       run: |
-        cd $WORKDIR/openwrt
+        cd $GITHUB_WORKSPACE/openwrt
         # 设置 ccache 压缩缓存
-        export CCACHE_DIR=$WORKDIR/ccache
+        export CCACHE_DIR=$GITHUB_WORKSPACE/ccache
         mkdir -p $CCACHE_DIR
         export CCACHE_COMPRESS=1
 
@@ -118,7 +112,7 @@ jobs:
 
     - name: Organize firmware
       run: |
-        cd $WORKDIR/openwrt/bin/targets/*/*
+        cd $GITHUB_WORKSPACE/openwrt/bin/targets/*/*
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
@@ -149,6 +143,6 @@ jobs:
         retain_days: 0
         keep_minimum_runs: 2
 
-    - name: Cleanup old releases (替代已弃用 action)
+    - name: Cleanup old releases (手动替代)
       run: |
         echo "请使用 dev-drprasad/delete-tag-and-release@v1.1 手动管理旧 release"
